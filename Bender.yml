@@ -37,6 +37,7 @@ dependencies:
   redmule:                { git: "https://github.com/pulp-platform/redmule.git", version: =2.0.4 }
   neureka:                { git: "https://github.com/pulp-platform/neureka.git", rev: f4e131c } # branch: lg/astral-v1.1
   softex:                 { git: "https://github.com/belanoa/softex.git"       , rev: astral-v1.0 }
+  fpnew:                  { git: "https://github.com/arpansur/cvfpu.git", rev: pace-pipe-rebase } # override fpnew to Arpan's PACE version
 
 export_include_dirs:
   - include
@@ -74,6 +75,7 @@ sources:
   - rtl/data_periph_demux.sv
   - rtl/core_demux_wrap.sv
   - rtl/core_region.sv
+  - rtl/cv32e40p_fp_wrapper.sv
   - target: simulation
     files:
     defines:
