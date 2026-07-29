@@ -78,7 +78,11 @@ module cluster_interconnect_wrap
     if( USE_HETEROGENEOUS_INTERCONNECT || !HWPE_PRESENT ) begin : hci_gen
       if (USE_ECC_INTERCONNECT) begin : gen_ecc_interco
         hci_ecc_interconnect #(
-          .N_HWPE ( HWPE_PRESENT             ),
+          // The hwpe_tcdm_slave interface array is always sized [0:0], and it is fully
+          // tied off when HWPE_PRESENT == 0 (see no_hwpe_gen in pulp_cluster.sv). Passing
+          // N_HWPE = 0 would declare the formal port as [0:-1] and break elaboration, so
+          // keep it at 1: the resulting branch never issues a request.
+          .N_HWPE ( 1                        ),
           .N_CORE ( NB_CORES                 ),
           .N_DMA  ( NB_DMAS                  ),
           .N_EXT  ( 4                        ),
@@ -110,7 +114,9 @@ module cluster_interconnect_wrap
         );
       end else begin : gen_standard_interco
         hci_interconnect #(
-          .N_HWPE ( HWPE_PRESENT             ),
+          // Same reason as in gen_ecc_interco above: N_HWPE must stay >= 1 so the formal
+          // port range matches the always-present (and tied-off) hwpe_tcdm_slave [0:0].
+          .N_HWPE ( 1                        ),
           .N_CORE ( NB_CORES                 ),
           .N_DMA  ( NB_DMAS                  ),
           .N_EXT  ( 4                        ),

@@ -99,6 +99,7 @@ import rapid_recovery_pkg::*;
 
   output core_data_req_t                 core_data_req_o,
   input  core_data_rsp_t                 core_data_rsp_i,
+  output logic [4:0]                     pace_mode_o,     // PACE: CSR_PACE mode/config
   output logic                           apu_master_req_o,
   input logic                            apu_master_gnt_i,
   // request channel
@@ -199,6 +200,7 @@ import rapid_recovery_pkg::*;
         // Atomic operation
         .data_atop_o           ( /* Unconnected */           ),
         // apu-interconnect
+        .pace_mode_o           ( pace_mode_o                 ),
         // Handshake
         .apu_req_o             ( apu_master_req_o            ),
         .apu_gnt_i             ( apu_master_gnt_i            ),

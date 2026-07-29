@@ -304,7 +304,11 @@ localparam hci_package::hci_size_parameter_t HciCoreSizeParam = '{
   EHW: DEFAULT_EHW
 };
 localparam hci_package::hci_size_parameter_t HciHwpeSizeParam = '{
-  DW:  (Cfg.HwpePresent) ? Cfg.HwpeNumPorts * DataWidth : 1,
+  // Keep DW sized for the full port count even when no HWPE is present: EW below is
+  // derived from HwpeNumPorts unconditionally, so a dummy DW of 1 makes the ECC
+  // decoder's N_CHUNK (= DW/32) collapse to 0 and breaks elaboration. The hwpe branch
+  // stays permanently tied off (see no_hwpe_gen), so this only affects sizing.
+  DW:  Cfg.HwpeNumPorts * DataWidth,
   AW:  AddrWidth,
   BW:  DEFAULT_BW,
   UW:  DEFAULT_UW,
@@ -403,6 +407,7 @@ logic [Cfg.NumCores-1:0] s_apu_master_rready;
 logic [Cfg.NumCores-1:0] s_apu_master_rvalid;
 logic [Cfg.NumCores-1:0][31:0] s_apu_master_rdata;
 logic [Cfg.NumCores-1:0][FpuOutFlagsWidth-1:0] s_apu_master_rflags;
+logic [Cfg.NumCores-1:0][4:0] s_pace_mode; // PACE: CSR_PACE mode/config per core
 
 //----------------------------------------------------------------------//
 // Interfaces between ICache - L0 - Icache_Interco and Icache_ctrl_unit //
@@ -996,7 +1001,8 @@ generate
       .apu_master_valid_i    ( s_apu_master_rvalid  [i] ),
       .apu_master_ready_o    ( s_apu_master_rready  [i] ),
       .apu_master_result_i   ( s_apu_master_rdata   [i] ),
-      .apu_master_flags_i    ( s_apu_master_rflags  [i] )
+      .apu_master_flags_i    ( s_apu_master_rflags  [i] ),
+      .pace_mode_o           ( s_pace_mode[i]           )
     );
 
     assign dbg_core_halted[i] = core2hmr[i].debug_halted;
@@ -1229,11 +1235,37 @@ begin
   assign s_apu_master_rflags[k] = s_apu__rflags[k];
 end
 
-// At the moment, the cluster does not support any shared execution unit
-assign s_apu_master_gnt    = '0;
-assign s_apu_master_rvalid = '0;
-assign s_apu_master_rdata  = '0;
-assign s_apu__rflags       = '0;
+// PACE: core 0 gets a private FPU (fpnew with PACE extension)
+cv32e40p_fp_wrapper #(
+  .FPU_ADDMUL_LAT ( 1 ),
+  .FPU_OTHERS_LAT ( 0 )
+) i_fp_wrapper_core0(
+  .clk_i          ( clk_i                  ),
+  .rst_ni         ( rst_ni                 ),
+  .apu_req_i      ( s_apu_master_req    [0]),
+  .apu_gnt_o      ( s_apu_master_gnt    [0]),
+  .apu_operands_i ( s_apu__operands     [0]),
+  .apu_op_i       ( s_apu__op           [0]),
+  .apu_flags_i    ( s_apu__flags        [0]),
+  .pace_mode_i    ( s_pace_mode         [0]),
+  .pace_param_i   ( '0                     ), // TODO: drive from cluster shared memory
+  .apu_rvalid_o   ( s_apu_master_rvalid [0]),
+  .apu_rdata_o    ( s_apu_master_rdata  [0]),
+  .apu_rflags_o   ( s_apu__rflags       [0])
+);
+
+// Remaining cores keep the previous tie-off (no shared execution unit)
+for (genvar c = 1; c < Cfg.NumCores; c++) 
+  begin : gen_apu_tieoff
+    assign s_apu_master_gnt    [c] = '0;
+    assign s_apu_master_rvalid [c] = '0;
+    assign s_apu_master_rdata  [c] = '0;
+    assign s_apu__rflags       [c] = '0;
+  end
+
+
+
+
 
 //**************************************************************
 //**** HW Processing Engines / Cluster-Coupled Accelerators ****

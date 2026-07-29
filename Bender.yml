@@ -28,7 +28,8 @@ dependencies:
   common_cells:           { git: "https://github.com/pulp-platform/common_cells.git", version: =1.38.0 }
   tech_cells_generic:     { git: "https://github.com/pulp-platform/tech_cells_generic.git", version: =0.2.3 }
   flex-v:                 { git: "https://github.com/pulp-platform/flex-v.git", rev: e9355c2f6ec4c105abdff39489e5d1be93bc4374 }
-  cv32e40p:               { git: "https://github.com/pulp-platform/cv32e40p.git", rev: astral-v1.0 }
+  # cv32e40p:               { git: "https://github.com/pulp-platform/cv32e40p.git", rev: astral-v1.0 }
+  cv32e40p:               { git: "/scratch/ajeong/cv32e40p-platform", rev: astral-v1.0-pace }
   ibex:                   { git: "https://github.com/pulp-platform/ibex.git", rev: "pulpissimo-v6.1.2" }
   scm:                    { git: "https://github.com/pulp-platform/scm.git", rev: v1.2.0 }
   hci:                    { git: "https://github.com/pulp-platform/hci.git", rev: 2a5a508 } # yt/wen-filter
