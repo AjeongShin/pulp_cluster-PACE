@@ -6,3 +6,9 @@ scripts/compile.tcl
 regression_tests/
 pulp-runtime/
 fault_injection_sim/
+
+# PACE test build and simulation artefacts
+sw/pace/*/build/
+sw/pace/*/*.log
+sw/pace/*/transcript
+sw/pace/*/modelsim.ini
