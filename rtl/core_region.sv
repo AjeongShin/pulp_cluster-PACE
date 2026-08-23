@@ -172,12 +172,12 @@ import rapid_recovery_pkg::*;
         .dm_halt_addr_i        ( DEBUG_START_ADDR + 16'h0800 ),
         .hart_id_i             ( hart_id                     ),
         .dm_exception_addr_i   ( DEBUG_START_ADDR + 16'h080C ), // From Control PULP, to be checked
-        // Instruction Interface
-        .instr_req_o           ( instr_req_o                 ),
-        .instr_gnt_i           ( instr_gnt_i                 ),
-        .instr_rvalid_i        ( instr_r_valid_i             ),
-        .instr_addr_o          ( instr_addr_o                ),
-        .instr_rdata_i         ( instr_r_rdata_i             ),
+        // Instruction Interface (routed through obi_pulp_adapter)
+        .instr_req_o           ( core_instr_req              ),
+        .instr_gnt_i           ( core_instr_gnt              ),
+        .instr_rvalid_i        ( core_instr_r_valid          ),
+        .instr_addr_o          ( core_instr_addr             ),
+        .instr_rdata_i         ( core_instr_r_rdata          ),
         // Data Interface
         .data_req_o            ( core_data_req_o.req         ),
         .data_gnt_i            ( core_data_rsp_i.gnt         ),
@@ -228,6 +228,25 @@ import rapid_recovery_pkg::*;
         // External performance monitoring signals
         .external_perf_i       ( ext_perf_i                  )
       );
+
+      // Restrict the core to a single outstanding fetch: the private icache
+      // grants in TAG_LOOKUP before the hit/miss decision is known and, on a
+      // miss, stops latching the incoming address while leaving that grant
+      // asserted. Same module and wiring the Ibex branch below already uses.
+      obi_pulp_adapter i_obi_pulp_adapter_instr_cv32 (
+        .clk_i       ( clk_i           ),
+        .rst_ni      ( rst_ni          ),
+        .setback_i   ( 1'b0            ),
+        .core_req_i  ( core_instr_req  ),
+        .mem_req_o   ( instr_req_o     ),
+        .mem_gnt_i   ( instr_gnt_i     ),
+        .mem_rvalid_i( instr_r_valid_i )
+      );
+      assign core_instr_gnt     = instr_gnt_i;
+      assign instr_addr_o       = core_instr_addr;
+      assign core_instr_r_rdata = instr_r_rdata_i;
+      assign core_instr_r_valid = instr_r_valid_i;
+
       assign core_busy_o = ~core_sleep;
     end else if ( CORE_TYPE_CL == 1 ) begin: RI5CY_CORE
       assign boot_addr = boot_addr_i;
