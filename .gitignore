@@ -12,3 +12,5 @@ sw/pace/*/build/
 sw/pace/*/*.log
 sw/pace/*/transcript
 sw/pace/*/modelsim.ini
+sw/pace/datagen/**/__pycache__/
+sw/pace/*/debug*.txt
