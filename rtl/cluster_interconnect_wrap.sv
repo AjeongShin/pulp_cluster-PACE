@@ -78,7 +78,7 @@ module cluster_interconnect_wrap
     if( USE_HETEROGENEOUS_INTERCONNECT || !HWPE_PRESENT ) begin : hci_gen
       if (USE_ECC_INTERCONNECT) begin : gen_ecc_interco
         hci_ecc_interconnect #(
-          .N_HWPE ( HWPE_PRESENT             ),
+          .N_HWPE ( 1                        ), // match the formal port range matches the always-present (and tied-off) hwpe_tcdm_slave [0:0]
           .N_CORE ( NB_CORES                 ),
           .N_DMA  ( NB_DMAS                  ),
           .N_EXT  ( 4                        ),
@@ -110,7 +110,7 @@ module cluster_interconnect_wrap
         );
       end else begin : gen_standard_interco
         hci_interconnect #(
-          .N_HWPE ( HWPE_PRESENT             ),
+          .N_HWPE ( 1                        ), 
           .N_CORE ( NB_CORES                 ),
           .N_DMA  ( NB_DMAS                  ),
           .N_EXT  ( 4                        ),

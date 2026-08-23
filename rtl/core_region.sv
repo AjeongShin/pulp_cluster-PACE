@@ -99,6 +99,7 @@ import rapid_recovery_pkg::*;
 
   output core_data_req_t                 core_data_req_o,
   input  core_data_rsp_t                 core_data_rsp_i,
+  output logic [4:0]                     pace_mode_o,     // PACE: CSR_PACE mode/config
   output logic                           apu_master_req_o,
   input logic                            apu_master_gnt_i,
   // request channel
@@ -172,7 +173,7 @@ import rapid_recovery_pkg::*;
         .dm_halt_addr_i        ( DEBUG_START_ADDR + 16'h0800 ),
         .hart_id_i             ( hart_id                     ),
         .dm_exception_addr_i   ( DEBUG_START_ADDR + 16'h080C ), // From Control PULP, to be checked
-        // Instruction Interface (routed through obi_pulp_adapter)
+        // Instruction Interface (routed through obi_pulp_adapter, instantiated below)
         .instr_req_o           ( core_instr_req              ),
         .instr_gnt_i           ( core_instr_gnt              ),
         .instr_rvalid_i        ( core_instr_r_valid          ),
@@ -199,6 +200,7 @@ import rapid_recovery_pkg::*;
         // Atomic operation
         .data_atop_o           ( /* Unconnected */           ),
         // apu-interconnect
+        .pace_mode_o           ( pace_mode_o                 ),
         // Handshake
         .apu_req_o             ( apu_master_req_o            ),
         .apu_gnt_i             ( apu_master_gnt_i            ),

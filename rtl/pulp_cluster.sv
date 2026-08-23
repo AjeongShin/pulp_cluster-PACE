@@ -94,7 +94,7 @@ module pulp_cluster
   localparam int unsigned PeRoutingLsb = 10,
   // FPU bus parameters
   localparam int unsigned FpuNumArgs = 3,
-  localparam int unsigned FpuOpCodeWidth = 6,
+  localparam int unsigned FpuOpCodeWidth = 7,
   localparam int unsigned FpuTypeWidth = 3,
   localparam int unsigned FpuInFlagsWidth = 15,
   localparam int unsigned FpuOutFlagsWidth = 5,
@@ -304,7 +304,7 @@ localparam hci_package::hci_size_parameter_t HciCoreSizeParam = '{
   EHW: DEFAULT_EHW
 };
 localparam hci_package::hci_size_parameter_t HciHwpeSizeParam = '{
-  DW:  (Cfg.HwpePresent) ? Cfg.HwpeNumPorts * DataWidth : 1,
+  DW:  Cfg.HwpeNumPorts * DataWidth,
   AW:  AddrWidth,
   BW:  DEFAULT_BW,
   UW:  DEFAULT_UW,
@@ -403,6 +403,9 @@ logic [Cfg.NumCores-1:0] s_apu_master_rready;
 logic [Cfg.NumCores-1:0] s_apu_master_rvalid;
 logic [Cfg.NumCores-1:0][31:0] s_apu_master_rdata;
 logic [Cfg.NumCores-1:0][FpuOutFlagsWidth-1:0] s_apu_master_rflags;
+logic [Cfg.NumCores-1:0][4:0] s_pace_mode; 
+localparam int unsigned PaceParamWidth = 2080;
+logic [PaceParamWidth-1:0] s_pace_param;
 
 //----------------------------------------------------------------------//
 // Interfaces between ICache - L0 - Icache_Interco and Icache_ctrl_unit //
@@ -996,7 +999,8 @@ generate
       .apu_master_valid_i    ( s_apu_master_rvalid  [i] ),
       .apu_master_ready_o    ( s_apu_master_rready  [i] ),
       .apu_master_result_i   ( s_apu_master_rdata   [i] ),
-      .apu_master_flags_i    ( s_apu_master_rflags  [i] )
+      .apu_master_flags_i    ( s_apu_master_rflags  [i] ),
+      .pace_mode_o           ( s_pace_mode[i]           )
     );
 
     assign dbg_core_halted[i] = core2hmr[i].debug_halted;
@@ -1229,11 +1233,37 @@ begin
   assign s_apu_master_rflags[k] = s_apu__rflags[k];
 end
 
-// At the moment, the cluster does not support any shared execution unit
-assign s_apu_master_gnt    = '0;
-assign s_apu_master_rvalid = '0;
-assign s_apu_master_rdata  = '0;
-assign s_apu__rflags       = '0;
+// PACE: core 0 gets a private FPU (fpnew with PACE extension)
+cv32e40p_fp_wrapper #(
+  .FPU_ADDMUL_LAT ( 1 ),
+  .FPU_OTHERS_LAT ( 0 )
+) i_fp_wrapper_core0(
+  .clk_i          ( clk_i                  ),
+  .rst_ni         ( rst_ni                 ),
+  .apu_req_i      ( s_apu_master_req    [0]),
+  .apu_gnt_o      ( s_apu_master_gnt    [0]),
+  .apu_operands_i ( s_apu__operands     [0]),
+  .apu_op_i       ( s_apu__op           [0]),
+  .apu_flags_i    ( s_apu__flags        [0]),
+  .pace_mode_i    ( s_pace_mode         [0]),
+  .pace_param_i   ( s_pace_param           ), // coefficients from pace_param_mem
+  .apu_rvalid_o   ( s_apu_master_rvalid [0]),
+  .apu_rdata_o    ( s_apu_master_rdata  [0]),
+  .apu_rflags_o   ( s_apu__rflags       [0])
+);
+
+// Remaining cores keep the previous tie-off (no shared execution unit)
+for (genvar c = 1; c < Cfg.NumCores; c++) 
+  begin : gen_apu_tieoff
+    assign s_apu_master_gnt    [c] = '0;
+    assign s_apu_master_rvalid [c] = '0;
+    assign s_apu_master_rdata  [c] = '0;
+    assign s_apu__rflags       [c] = '0;
+  end
+
+
+
+
 
 //**************************************************************
 //**** HW Processing Engines / Cluster-Coupled Accelerators ****
@@ -1257,13 +1287,18 @@ generate
       .evt_o             ( s_hwpe_evt     ),
       .busy_o            ( s_hwpe_busy    )
     );
+    // PACE: mirroring Snitch's `pace_param = PaceCfg.enable ? pace_param_from_mem : '0`
+    assign s_pace_param = '0;
   end
   else begin : no_hwpe_gen
-    assign s_hwpe_cfg_bus.r_valid = '1;
-    assign s_hwpe_cfg_bus.gnt     = '1;
-    assign s_hwpe_cfg_bus.r_rdata = 32'hdeadbeef;
-    assign s_hwpe_cfg_bus.r_id    = '0;
-    assign s_hwpe_cfg_bus.r_opc   = '0;
+    pace_param_mem #(
+      .PACE_PARAM_WIDTH ( PaceParamWidth )
+    ) i_pace_param_mem (
+      .clk_i        ( clk_i          ),
+      .rst_ni       ( rst_ni         ),
+      .periph_slave ( s_hwpe_cfg_bus ), // free accelerator config slot
+      .pace_param_o ( s_pace_param   )  // flat coefficient bus to core 0's FPU
+    );
     assign s_hci_hwpe[0].req   = 1'b0;
     assign s_hci_hwpe[0].add   = '0;
     assign s_hci_hwpe[0].wen   = '0;
