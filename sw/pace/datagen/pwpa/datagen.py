@@ -42,11 +42,10 @@ BOUNDS = {
 }
 
 INVERSE_FUNCTIONS = {"inv", "sqrt", "rsqrt"}
-# CSR_PACE (0xba0) layout: [4:2] = polynomial degree, [1:0] = function select.
-# The function code matches the two bits Snitch carries in the instruction.
+# CSR_PACE (0xba0) carries the polynomial degree in [2:0]. The function is not in
+# the CSR: it comes from the instruction's funct5, so the code below is emitted for
+# documentation and to name the golden model, not to build a CSR value.
 PACE_FUNC_CODES = {"pwpa": 0, "inv": 1, "sqrt": 2, "rsqrt": 3}
-PACE_FUNC_SHIFT = 0
-PACE_DEGREE_SHIFT = 2
 
 
 def widen_fp_for_compare(raw, fmt):
@@ -178,12 +177,9 @@ def generate_csr_defines(keys):
         raise ValueError(f"n_deg {degree} does not fit the 3-bit CSR_PACE degree field")
 
     return [
-        f"#define PACE_FUNC {PACE_FUNC_CODES[func]}  // {func}",
+        f"#define PACE_FUNC {PACE_FUNC_CODES[func]}  // {func}, selected by funct5",
         f"#define PACE_DEGREE {degree}",
-        f"#define PACE_FUNC_SHIFT {PACE_FUNC_SHIFT}",
-        f"#define PACE_DEGREE_SHIFT {PACE_DEGREE_SHIFT}",
-        "#define CSR_VALUE ((PACE_DEGREE<<PACE_DEGREE_SHIFT) | "
-        "(PACE_FUNC<<PACE_FUNC_SHIFT))",
+        "#define CSR_VALUE PACE_DEGREE",
     ]
 
 

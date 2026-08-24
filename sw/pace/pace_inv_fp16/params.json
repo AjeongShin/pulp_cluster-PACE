@@ -1,0 +1,19 @@
+{
+    "x_min" : -11,
+    "x_max" : -0.1,
+    "n_deg" : 2,
+    "n_part": 16,
+    "n_test": 1024,
+    "seed"  : 1234,
+    "eps"   : 5e-7,
+    "prec"  : "FP16",
+    "super_fmt" : "FP32",
+    "fn_name": "inv",
+    "enable" : true,
+    "inv" : true,
+    "sqrt": false,
+    "rsqrt": false,
+    "extend": false,
+    "enable_fp32"  : true,
+    "debug_fname" : "debug_inv_fp16.txt"
+}

@@ -3,15 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 
-#define PACE_FUNC 2  // sqrt
+#define PACE_FUNC 2  // sqrt, selected by funct5
 
 #define PACE_DEGREE 2
 
-#define PACE_FUNC_SHIFT 0
-
-#define PACE_DEGREE_SHIFT 2
-
-#define CSR_VALUE ((PACE_DEGREE<<PACE_DEGREE_SHIFT) | (PACE_FUNC<<PACE_FUNC_SHIFT))
+#define CSR_VALUE PACE_DEGREE
 
 #define ENABLE_FP32 1
 

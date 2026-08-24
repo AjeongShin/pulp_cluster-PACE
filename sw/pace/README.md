@@ -4,12 +4,14 @@ PACE evaluates a function as a piecewise polynomial inside the FPU: software
 loads a coefficient bank, an instruction hands an operand to the FPU, and the
 polynomial for the matching partition is evaluated with Horner's method.
 
-    pace_pwpa/    generic polynomial, no exponent handling (fits exp here)
-    pace_inv/     1/x
-    pace_sqrt/    sqrt(x)
-    pace_rsqrt/   1/sqrt(x)
-    datagen/      generates data.h from params.json
-    probe/        signal probe and a waveform set
+    pace_pwpa/      generic polynomial, no exponent handling (fits exp here)
+    pace_inv/       1/x
+    pace_sqrt/      sqrt(x)
+    pace_rsqrt/     1/sqrt(x)
+    pace_inv_fp16/  1/x in FP16
+    pace_vinv_fp16/ 1/x in FP16, two lanes per instruction
+    datagen/        generates data.h from params.json
+    probe/          signal probe and a waveform set
 
 ## Running
 
@@ -40,19 +42,29 @@ so this adds one rather than changing one.
 
 ## Software interface
 
-Coefficients are plain word stores to `0x1020_1000`. `CSR_PACE` is `0xba0`:
+Coefficients are plain word stores to `0x1020_1000`. `CSR_PACE` is `0xba0` and
+carries the polynomial degree in `[2:0]`; the function comes from the instruction.
 
-| bits | field |
-|---|---|
-| `[4:2]` | degree |
-| `[1:0]` | 0 pwpa, 1 inv, 2 sqrt, 3 rsqrt |
+Scalar PACE is an OP-FP instruction (opcode `0x53`), function in `funct5`, format in
+`fmt`:
 
-`PACE_S` is an OP-FP instruction, `funct5 = 01100`. pulp-gcc has no `.insn` here
-and the firmware is soft-float, so the sequence is raw words on fixed registers:
+| funct5 | function | FP32 (`fmt 00`) | FP16 (`fmt 10`) |
+|---|---|---|---|
+| `01100` | pwpa | `0x60c505d3` | |
+| `01101` | inv | `0x68c505d3` | `0x6cc505d3` |
+| `01110` | sqrt | `0x70c505d3` | |
+| `01111` | rsqrt | `0x78c505d3` | |
+
+Vectorial PACE sits in the PULP SIMD space (opcode `0x33`, `instr[31:30] = 10`) with
+the function in `instr[26:25]` and the format in `instr[13:12]`. Two FP16 lanes per
+instruction: `vpace.h fa1, fa0` is `0xba0525b3`.
+
+pulp-gcc has no `.insn` here and the firmware is soft-float, so every sequence is raw
+words on fixed registers:
 
     fmv.w.x fa2, x0      0xf0000653
     fmv.w.x fa0, a5      0xf0078553
-    PACE_S  fa1,fa0,fa2  0x60c505d3
+    PACE_S  fa1,fa0,fa2  0x68c505d3
     fmv.x.w a4, fa1      0xe0058753
 
 ## Regenerating data.h
@@ -65,9 +77,10 @@ Reproduces the committed `data.h` byte for byte.
 ## Verification
 
 Each test compares all 1024 results against the generator's model with no
-tolerance. All four operations are covered.
+tolerance. All four operations, both formats and the vectorial form are covered.
 
-    hello  pace_pwpa  pace_inv  pace_sqrt  pace_rsqrt      all errors = 0
+    hello  pace_pwpa  pace_inv  pace_sqrt  pace_rsqrt
+    pace_inv_fp16  pace_vinv_fp16                          all errors = 0
 
 `probe/pace_signals.tcl` follows the coefficients from the bank into fpnew:
 
@@ -87,11 +100,12 @@ For waveforms, run with `gui=1` and `do ../probe/pace_waves.do`.
 
 Passing tests only show the answer is right. These break it on purpose:
 
-| change | result |
-|---|---|
-| degree 2 to 1 | 1024 errors |
-| sqrt word replaced with the inv one | 930 errors |
-| FP16 format field set back to FP32 | 1024 errors |
-| vector word replaced with the scalar one | 512, exactly half |
+| test | change | result |
+|---|---|---|
+| `pace_rsqrt` | degree 2 to 1 | 1024 errors |
+| `pace_sqrt` | funct5 set to the inv one | 930 errors |
+| `pace_inv_fp16` | fmt set back to FP32 | 1024 errors |
+| `pace_vinv_fp16` | vector word replaced with the scalar one | 512, exactly half |
 
-The last two were measured on the transprecision branch.
+The second one is what shows the function really comes from `funct5`: nothing else in
+the test changes, and the CSR no longer carries a function field.
