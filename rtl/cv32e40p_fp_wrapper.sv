@@ -124,31 +124,19 @@ module cv32e40p_fp_wrapper
   //---------------
   logic [PaceParamWidth-1:0]   pace_param;
   fpnew_pkg::pace_mode_t       pace_mode;
-  fpnew_pkg::operation_e       pace_op;
   logic                        pace_is_op;
 
   assign pace_param = pace_param_i;
-  assign pace_is_op = (fpnew_pkg::operation_e'(fpu_op) == fpnew_pkg::PWPA);
+  assign pace_is_op = (fpnew_pkg::operation_e'(fpu_op) inside {
+      fpnew_pkg::PWPA, fpnew_pkg::PACE_INV, fpnew_pkg::PACE_SQRT, fpnew_pkg::PACE_RSQRT});
 
-  // CSR_PACE (0xba0) layout: [4:2] = polynomial degree, [1:0] = function (0 PWPA, 1 inv, 2 sqrt, 3 rsqrt).
+  // CSR_PACE (0xba0) carries the polynomial degree only; the decoder names the operation.
   assign pace_mode = '{
       extend: 1'b0,
       enable: pace_is_op,
-      degree: fpnew_pkg::pace_deg_t'(pace_mode_i[4:2])
+      degree: fpnew_pkg::pace_deg_t'(pace_mode_i[2:0])
   };
 
-  always_comb begin
-    if (pace_is_op) begin
-      unique case (pace_mode_i[1:0])
-        2'b01:   pace_op = fpnew_pkg::PACE_INV;
-        2'b10:   pace_op = fpnew_pkg::PACE_SQRT;
-        2'b11:   pace_op = fpnew_pkg::PACE_RSQRT;
-        default: pace_op = fpnew_pkg::PWPA;   // generic piecewise polynomial
-      endcase
-    end else begin
-      pace_op = fpnew_pkg::operation_e'(fpu_op);   // ordinary FP operation
-    end
-  end
 
   //---------------
   // FPU instance
@@ -157,7 +145,7 @@ module cv32e40p_fp_wrapper
   fpnew_top #(
       .Features      (FPU_FEATURES),
       .Implementation(FPU_IMPLEMENTATION),
-      .DivSqrtSel    (fpnew_pkg::TH32),
+      .DivSqrtSel    (fpnew_pkg::THMULTI),
       .TagType       (logic)
   ) i_fpnew_bulk (
       .clk_i         (clk_i),
@@ -167,7 +155,7 @@ module cv32e40p_fp_wrapper
       .rnd_mode_i    (fpnew_pkg::roundmode_e'(fp_rnd_mode)),
       .pace_param_i  (pace_param),  // PACE parameters
       .pace_mode_i   (pace_mode),   // PACE modes
-      .op_i          (pace_op),     // PACE: CSR-remapped op 
+      .op_i          (fpnew_pkg::operation_e'(fpu_op)),
       .op_mod_i      (fpu_op_mod),
       .src_fmt_i     (fpnew_pkg::fp_format_e'(fpu_src_fmt)),
       .dst_fmt_i     (fpnew_pkg::fp_format_e'(fpu_dst_fmt)),

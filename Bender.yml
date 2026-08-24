@@ -28,7 +28,7 @@ dependencies:
   common_cells:           { git: "https://github.com/pulp-platform/common_cells.git", version: =1.38.0 }
   tech_cells_generic:     { git: "https://github.com/pulp-platform/tech_cells_generic.git", version: =0.2.3 }
   flex-v:                 { git: "https://github.com/pulp-platform/flex-v.git", rev: e9355c2f6ec4c105abdff39489e5d1be93bc4374 }
-  cv32e40p:               { git: "https://github.com/AjeongShin/cv32e40p-platform.git", rev: ajshin/astral-pace }
+  cv32e40p:               { git: "https://github.com/AjeongShin/cv32e40p-platform.git", rev: ajshin/astral-pace-transprecision }
   fpnew:                  { git: "https://github.com/arpansur/cvfpu.git", rev: 2603fa342cb6781dda5886d643fd754e21ecb27b } # PACE fpnew fork, pinned by SHA
   ibex:                   { git: "https://github.com/pulp-platform/ibex.git", rev: "pulpissimo-v6.1.2" }
   scm:                    { git: "https://github.com/pulp-platform/scm.git", rev: v1.2.0 }
