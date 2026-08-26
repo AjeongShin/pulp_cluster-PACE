@@ -404,7 +404,18 @@ logic [Cfg.NumCores-1:0] s_apu_master_rvalid;
 logic [Cfg.NumCores-1:0][31:0] s_apu_master_rdata;
 logic [Cfg.NumCores-1:0][FpuOutFlagsWidth-1:0] s_apu_master_rflags;
 logic [Cfg.NumCores-1:0][4:0] s_pace_mode; 
-localparam int unsigned PaceParamWidth = 2080;
+// PACE coefficient-bank geometry. The bank holds (degree+1) coefficients per partition,
+// the interior partition boundaries and the two epsilon terms, each PaceDataWidth wide.
+// Deriving the width here keeps pulp_cluster, pace_param_mem and the FPU wrapper in step
+// when the geometry changes, and these numbers must match what datagen emits into
+// params[]: (deg+1)*parts + (parts-1) + 2*eps words.
+//   PaceDegree <= MAX_PACE_DEGREE (4); PaceParts a power of two in 4 .. 64.
+localparam int unsigned PaceDegree    = 2;
+localparam int unsigned PaceParts     = 16;
+localparam int unsigned PaceEps       = 1;
+localparam int unsigned PaceDataWidth = 32;
+localparam int unsigned PaceParamWidth =
+    ((PaceDegree + 1) * PaceParts + (PaceParts - 1) + 2 * PaceEps) * PaceDataWidth;
 logic [PaceParamWidth-1:0] s_pace_param;
 
 //----------------------------------------------------------------------//
@@ -1236,7 +1247,11 @@ end
 // PACE: core 0 gets a private FPU (fpnew with PACE extension)
 cv32e40p_fp_wrapper #(
   .FPU_ADDMUL_LAT ( 1 ),
-  .FPU_OTHERS_LAT ( 0 )
+  .FPU_OTHERS_LAT ( 0 ),
+  .PaceDegree     ( PaceDegree    ),
+  .PaceParts      ( PaceParts     ),
+  .PaceEps        ( PaceEps       ),
+  .PaceDataWidth  ( PaceDataWidth )
 ) i_fp_wrapper_core0(
   .clk_i          ( clk_i                  ),
   .rst_ni         ( rst_ni                 ),
