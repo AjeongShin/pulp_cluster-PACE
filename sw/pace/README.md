@@ -13,6 +13,10 @@ Operations, one opcode each:
     pace_inv_fp16/  1/x in FP16
     pace_vinv_fp16/ 1/x in FP16, two lanes per instruction
 
+Kernels, where PACE is one step among several:
+
+    pace_softmax/   max -> subtract -> exp (pwpa) -> sum -> 1/x (inv) -> scale
+
 Activations, all on the generic pwpa opcode -- the same instruction word, only
 data.h differs:
 
@@ -117,6 +121,34 @@ words on fixed registers:
     PACE_S  fa1,fa0,fa2  0x68c505d3
     fmv.x.w a4, fa1      0xe0058753
 
+## Kernels
+
+Softmax depends on every element of a row, so it cannot be one instruction. PACE
+evaluates the two pointwise pieces -- `exp` on the generic pwpa opcode and `1/x` on
+`PACE_INV` -- and the row maximum, the subtraction, the reduction and the scaling are
+ordinary FP instructions. The Snitch reference splits it the same way; what differs is
+everything around it, because CV32E40P has no SSR streamer, no FREP loop and no DMA, so
+the kernel is a plain scalar loop on one core.
+
+Two consequences worth knowing before writing another kernel:
+
+**The bank is reloaded mid-kernel.** `exp` and `inv` need different coefficients and
+there is one bank, so the kernel runs every exp, then overwrites `0x1020_1000` before
+the reciprocals. Snitch does this too, with two DMA transfers. Removing the reload makes
+all 256 outputs wrong -- `PACE_INV` runs happily against exp's coefficients and returns
+plausible garbage, so this is worth a control rather than an assumption.
+
+**The reduction order is part of the contract.** A sum of floats depends on the order it
+is accumulated in, so `datagen/softmax/datagen.py` walks each row left to right in the
+target precision, exactly as `test.c` does. Reusing the Snitch generator's reduction
+would model its unrolled multi-lane order and disagree with our hardware for the right
+reason.
+
+The firmware is soft-float, so `fmax.s`, `fsub.s`, `fadd.s` and `fmul.s` are raw words
+on fixed registers just like the PACE ones. `test.c` has the encodings.
+
+    python3 datagen/softmax/datagen.py -c pace_softmax/params.json pace_softmax/data.h
+
 ## Regenerating data.h
 
     cd sw/pace
@@ -149,7 +181,7 @@ activations are covered.
     pace_rsqrt      pace_inv_fp16   pace_vinv_fp16
     pace_gelu       pace_silu       pace_tanh       pace_sigmoid
     pace_exp_fp16   pace_gelu_fp16  pace_silu_fp16
-    pace_tanh_fp16  pace_sigmoid_fp16                       all errors = 0
+    pace_tanh_fp16  pace_sigmoid_fp16   pace_softmax        all errors = 0
 
 `probe/pace_signals.tcl` follows the coefficients from the bank into fpnew:
 
@@ -175,6 +207,7 @@ Passing tests only show the answer is right. These break it on purpose:
 | `pace_sqrt` | funct5 set to the inv one | 930 errors |
 | `pace_inv_fp16` | fmt set back to FP32 | 1024 errors |
 | `pace_vinv_fp16` | vector word replaced with the scalar one | 512, exactly half |
+| `pace_softmax` | the mid-kernel bank reload removed | 256, every element |
 
 The second one is what shows the function really comes from `funct5`: nothing else in
 the test changes, and the CSR no longer carries a function field.

@@ -287,7 +287,6 @@ def _alias_dtype(dtype):
 def format_array_declaration(dtype, uid, shape, alignment=None, section=None, hex_format=False):
     attributes = _variable_attributes(alignment, section)
     if hex_format:
-        print(f"dtype is {dtype}")
         prec = type_to_precision_t(dtype)
         dtype = hex_ctype_from_precision_t(prec)
     s = f'{_alias_dtype(dtype)} {uid}'
@@ -390,8 +389,6 @@ def format_array_initializer(dtype, array, hex_format=False):
         "uint16_t":  np.uint16,
         "uint8_t":   np.uint8
     }
-
-    print(f"dtype in hex formatting is {dtype}")
 
     prec = ctype_to_prec.get(dtype, None)
     if prec is None:

@@ -56,9 +56,6 @@ def evaluate_pwpa(ifmap: np.ndarray, coeffs: np.ndarray, part_id: np.ndarray, de
         y = coeffs_part[degree]
         for deg in range(degree - 1, -1, -1):
             y = y * feat + coeffs_part[deg]
-            # print(f"y dtype {y.dtype}, feat dtype {feat.dtype}, coeffs dtype {coeffs_part[deg].dtype}")
-            if(idx==328 or idx==475 or idx==522 or idx==856):
-                print(f"idx: {idx}, feat:{feat}, part_id: {part_id[idx]}")
             y = np.asarray(y, dtype=np_prec).astype(np.float64)
         ofmap[idx] = np.asarray(y, dtype=np_prec)
     return ofmap

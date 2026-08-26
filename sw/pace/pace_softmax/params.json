@@ -1,0 +1,12 @@
+{
+  "rows": 4,
+  "cols": 64,
+  "x_min": -4.0,
+  "x_max": 4.0,
+  "n_deg": 2,
+  "n_part": 16,
+  "prec": "FP32",
+  "super_fmt": "FP32",
+  "eps": 5e-07,
+  "seed": 1234
+}
