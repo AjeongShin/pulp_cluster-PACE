@@ -33,6 +33,16 @@ def rsqrt(x):
     y_t = torch.rsqrt(x_t)
     return y_t.numpy()
 
+def tanh(x):
+    x_t = torch.from_numpy(np.asarray(x))
+    y_t = torch.tanh(x_t)
+    return y_t.numpy()
+
+def sigmoid(x):
+    x_t = torch.from_numpy(np.asarray(x))
+    y_t = torch.sigmoid(x_t)
+    return y_t.numpy()
+
 def gelu(x):
     x_t = torch.from_numpy(np.asarray(x))
     y_t = torch.nn.functional.gelu(x_t)
@@ -44,8 +54,22 @@ ACTIVATIONS = {
     "inv": inv,
     "sqrt": sqrt,
     "rsqrt": rsqrt,
-    "gelu": gelu
+    "gelu": gelu,
+    "tanh": tanh,
+    "sigmoid": sigmoid
 }
+
+def _in_fp32(fn, x):
+    """Evaluate in FP32 and cast back to the input dtype.
+
+    torch 1.10 CPU has no Half kernel for exp, rsqrt or gelu, so an FP16 ifmap fails for
+    every activation except inv (which is a division). Widening also makes the reference
+    the correctly-rounded FP32 value rather than an FP16-internal computation.
+    """
+    x = np.asarray(x)
+    y = fn(x.astype(np.float32))
+    return np.asarray(y, dtype=x.dtype)
+
 
 def golden_model(ifmap, fn_name):
     if fn_name not in ACTIVATIONS:
@@ -53,4 +77,4 @@ def golden_model(ifmap, fn_name):
                          f"Available: {list(ACTIVATIONS.keys())}")
 
     fn = ACTIVATIONS[fn_name]
-    return fn(ifmap)
+    return _in_fp32(fn, ifmap)

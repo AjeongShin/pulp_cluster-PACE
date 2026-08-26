@@ -1,0 +1,19 @@
+{
+  "x_min": -8.0,
+  "x_max": 8.0,
+  "n_deg": 2,
+  "n_part": 16,
+  "n_test": 1024,
+  "seed": 1234,
+  "eps": 5e-07,
+  "prec": "FP16",
+  "super_fmt": "FP32",
+  "fn_name": "gelu",
+  "enable": true,
+  "inv": false,
+  "sqrt": false,
+  "rsqrt": false,
+  "extend": false,
+  "enable_fp32": true,
+  "debug_fname": "debug_gelu_fp16.txt"
+}

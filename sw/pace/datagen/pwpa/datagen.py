@@ -36,6 +36,8 @@ BOUNDS = {
     "silu": (None, None),
     "exp": (None, None),
     "gelu": (None, None),
+    "tanh": (None, None),
+    "sigmoid": (None, None),
     "inv": (1, 2),
     "sqrt": (1, 4),
     "rsqrt": (1, 4),
