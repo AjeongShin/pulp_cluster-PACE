@@ -4,14 +4,25 @@ PACE evaluates a function as a piecewise polynomial inside the FPU: software
 loads a coefficient bank, an instruction hands an operand to the FPU, and the
 polynomial for the matching partition is evaluated with Horner's method.
 
-    pace_pwpa/      generic polynomial, no exponent handling (fits exp here)
+Operations, one opcode each:
+
+    pace_pwpa/      generic polynomial, no exponent handling (exp lives here)
     pace_inv/       1/x
     pace_sqrt/      sqrt(x)
     pace_rsqrt/     1/sqrt(x)
     pace_inv_fp16/  1/x in FP16
     pace_vinv_fp16/ 1/x in FP16, two lanes per instruction
-    datagen/        generates data.h from params.json
-    probe/          signal probe and a waveform set
+
+Activations, all on the generic pwpa opcode -- the same instruction word, only
+data.h differs:
+
+    pace_gelu/  pace_silu/  pace_tanh/  pace_sigmoid/
+    pace_exp_fp16/  pace_gelu_fp16/  pace_silu_fp16/
+    pace_tanh_fp16/ pace_sigmoid_fp16/
+
+    pace_rm_ignored/  control: PACE ignores funct3 (see Verification)
+    datagen/          generates data.h from params.json
+    probe/            signal probe and a waveform set
 
 ## Running
 
@@ -50,7 +61,7 @@ Scalar PACE is an OP-FP instruction (opcode `0x53`), function in `funct5`, forma
 
 | funct5 | function | FP32 (`fmt 00`) | FP16 (`fmt 10`) |
 |---|---|---|---|
-| `01100` | pwpa | `0x60c505d3` | |
+| `01100` | pwpa | `0x60c505d3` | `0x64c505d3` |
 | `01101` | inv | `0x68c505d3` | `0x6cc505d3` |
 | `01110` | sqrt | `0x70c505d3` | |
 | `01111` | rsqrt | `0x78c505d3` | |
@@ -74,13 +85,32 @@ words on fixed registers:
 
 Reproduces the committed `data.h` byte for byte.
 
+A new activation costs a `params.json` and one entry in `datagen/_pace_local/golden.py`.
+Nothing else changes -- not the RTL, not the instruction word, not `test.c`.
+
+`golden.py` evaluates the reference in FP32 and casts back to the requested precision.
+Computing it directly in FP16 fails: torch has no Half CPU kernel for `exp`, `rsqrt` or
+`gelu`, which is why `inv` -- a division -- used to be the only function with an FP16
+test. Widening also makes the reference the correctly-rounded FP32 value.
+
+FP16ALT has no test. The decoder reaches it (`fmt=10` with `rm=101`) and the datapath
+evaluates it, but the generator's precision system is keyed by byte size
+(`FP64:8, FP32:4, FP16:2, FP8:1`), and FP16ALT is two bytes like FP16, so there is no
+label for it. `float_to_hex` does carry a bfloat16 branch, reachable through the `__fp8`
+ctype, but it truncates instead of rounding to nearest -- a golden built on it would
+disagree with the RNE hardware.
+
 ## Verification
 
 Each test compares all 1024 results against the generator's model with no
-tolerance. All four operations, both formats and the vectorial form are covered.
+tolerance. All four operations, both formats, the vectorial form and five
+activations are covered.
 
-    hello  pace_pwpa  pace_inv  pace_sqrt  pace_rsqrt
-    pace_inv_fp16  pace_vinv_fp16                          all errors = 0
+    hello           pace_pwpa       pace_inv        pace_sqrt
+    pace_rsqrt      pace_inv_fp16   pace_vinv_fp16
+    pace_gelu       pace_silu       pace_tanh       pace_sigmoid
+    pace_exp_fp16   pace_gelu_fp16  pace_silu_fp16
+    pace_tanh_fp16  pace_sigmoid_fp16                       all errors = 0
 
 `probe/pace_signals.tcl` follows the coefficients from the bank into fpnew:
 
@@ -109,3 +139,11 @@ Passing tests only show the answer is right. These break it on purpose:
 
 The second one is what shows the function really comes from `funct5`: nothing else in
 the test changes, and the CSR no longer carries a function field.
+
+`pace_rm_ignored` is the inverse control. It is `pace_pwpa` with `funct3` set to `101`
+instead of `000` -- the format is still FP32, so the golden data is unchanged and any
+mismatch would be the rounding mode alone. It gives `errors = 0`, and so does `111`.
+`fpnew_pace_fma_multi.sv` hardwires `fma_round_mode = RNE` on the Horner path, so the rm
+field cannot reach a PACE result. That is what makes clearing `check_fprm` in the decoder
+safe, and it is worth a regression test because the decoder's FP16ALT encoding overloads
+that same field.

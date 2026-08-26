@@ -36,6 +36,8 @@ BOUNDS = {
     "silu": (None, None),
     "exp": (None, None),
     "gelu": (None, None),
+    "tanh": (None, None),
+    "sigmoid": (None, None),
     "inv": (1, 2),
     "sqrt": (1, 4),
     "rsqrt": (1, 4),
@@ -49,18 +51,15 @@ PACE_FUNC_CODES = {"pwpa": 0, "inv": 1, "sqrt": 2, "rsqrt": 3}
 
 
 def widen_fp_for_compare(raw, fmt):
-    """
-    This casting enables the reuse of a single FP32 comparator for both FP16 and FP32 operands, while incurring only minimal hardware overhead.
+    """Re-encode an FP16 value so an FP32 comparator can order it.
 
-    The FP16 format consists of a 1-bit sign, a 5-bit exponent, and a 10-bit mantissa, whereas FP32 uses a 1-bit sign, an 8-bit exponent, and a 23-bit mantissa.
-    An FP16 value is therefore encoded as:
-    | s | e4 e3 e2 e1 e0 | m9 m8 m7 m6 m5 m4 m3 m2 m1 m0 |.
+    FP16 is | s | e4..e0 | m9..m0 |. Padding the exponent's high bits with ones and
+    the mantissa's low bits with zeros gives
 
-    To make FP16 values comparable using an FP32 comparator, the FP16 exponent is extended by padding its most significant bits with ones, and the mantissa is extended by padding with zeros.
-    The resulting casted FP32-compatible representation is:
-    | s | 1 1 1 e4 e3 e2 e1 e0 | 0 0 0 0 0 0 0 0 0 0 0 0 0 0 m9 m8 m7 m6 m5 m4 m3 m2 m1 m0 |.
+        | s | 1 1 1 e4..e0 | m9..m0 0..0 |
 
-    This representation preserves the ordering of FP16 values under unsigned comparison, allowing correct comparisons using existing FP32 hardware without additional control logic.
+    which preserves FP16 ordering under FP32 comparison, so the hardware needs one
+    comparator for both formats instead of two.
     """
     raw = np.asarray(raw, dtype=fmt).view(np.uint16).astype(np.uint32)
     sign = (raw & 0x8000) >> 15
