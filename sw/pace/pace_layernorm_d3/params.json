@@ -1,0 +1,10 @@
+{
+  "channels": 4,
+  "elems": 256,
+  "n_deg": 3,
+  "n_part": 8,
+  "prec": "FP32",
+  "super_fmt": "FP32",
+  "eps": 5e-07,
+  "seed": 1234
+}

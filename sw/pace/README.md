@@ -15,7 +15,9 @@ Operations, one opcode each:
 
 Kernels, where PACE is one step among several:
 
-    pace_softmax/   max -> subtract -> exp (pwpa) -> sum -> 1/x (inv) -> scale
+    pace_softmax/       max -> subtract -> exp (pwpa) -> sum -> 1/x (inv) -> scale
+    pace_layernorm/     sum, sum of squares -> variance -> 1/sqrt (rsqrt) -> centre and scale
+    pace_layernorm_d3/  the same at the reference geometry, degree 3 over 8 partitions
 
 Activations, all on the generic pwpa opcode -- the same instruction word, only
 data.h differs:
@@ -147,6 +149,26 @@ reason.
 The firmware is soft-float, so `fmax.s`, `fsub.s`, `fadd.s` and `fmul.s` are raw words
 on fixed registers just like the PACE ones. `test.c` has the encodings.
 
+LayerNorm is the same shape with a smaller PACE footprint: one operation rather than
+two, so the bank is loaded once and never reloaded. `PACE_RSQRT` fits only the mantissa,
+so its coefficients cover [1, 4] whatever the variance turns out to be.
+
+    python3 datagen/layernorm/datagen.py -c pace_layernorm/params.json pace_layernorm/data.h
+
+Its reference config is degree 3 over 8 partitions, not our default 2 over 16, so
+`pace_layernorm_d3` needs a rebuild at that geometry -- see the section above. Both pass.
+
+|                      | softmax                     | layernorm                  |
+|----------------------|-----------------------------|----------------------------|
+| PACE does            | exp (pwpa) **and** 1/x (inv)| 1/sqrt (rsqrt) only        |
+| bank reloaded        | yes, mid-kernel             | no                         |
+| control that breaks it | reload removed: 256/256   | reduction reversed: 968/1024 |
+
+One thing measured rather than assumed: writing the squared term as `(x * inv_n) * x`
+instead of `(x * x) * inv_n` makes no difference here, because a power-of-two element
+count makes `inv_n` exact and the multiply a pure exponent adjustment. Both give
+`errors = 0`. It would matter for a non-power-of-two N.
+
     python3 datagen/softmax/datagen.py -c pace_softmax/params.json pace_softmax/data.h
 
 ## Regenerating data.h
@@ -181,7 +203,12 @@ activations are covered.
     pace_rsqrt      pace_inv_fp16   pace_vinv_fp16
     pace_gelu       pace_silu       pace_tanh       pace_sigmoid
     pace_exp_fp16   pace_gelu_fp16  pace_silu_fp16
-    pace_tanh_fp16  pace_sigmoid_fp16   pace_softmax        all errors = 0
+    pace_tanh_fp16  pace_sigmoid_fp16   pace_softmax    pace_layernorm
+                                                        all errors = 0
+
+At degree 3 over 8 partitions, after a rebuild at that geometry:
+
+    pace_rsqrt_d3   pace_rsqrt_d3_fp16   pace_layernorm_d3   all errors = 0
 
 `probe/pace_signals.tcl` follows the coefficients from the bank into fpnew:
 
@@ -208,6 +235,8 @@ Passing tests only show the answer is right. These break it on purpose:
 | `pace_inv_fp16` | fmt set back to FP32 | 1024 errors |
 | `pace_vinv_fp16` | vector word replaced with the scalar one | 512, exactly half |
 | `pace_softmax` | the mid-kernel bank reload removed | 256, every element |
+| `pace_layernorm` | the channel reduction run backwards | 968 of 1024 |
+| `pace_layernorm` | deg2/16 data on a deg3/8 build | 1024, every element |
 
 The second one is what shows the function really comes from `funct5`: nothing else in
 the test changes, and the CSR no longer carries a function field.
