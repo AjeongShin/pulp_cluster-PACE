@@ -46,10 +46,49 @@ memory.
 | `HwpePresent` | `0` | frees the config slot at `0x1020_1000` for the coefficient bank |
 | `HMRPresent` | `1` | `0` leaves the HMR register interface without a ready and boot deadlocks |
 | `PaceDegree` | `2` | maximum degree; software selects up to this through `CSR_PACE` |
-| `PaceParts` | `16` | |
+| `PaceParts` | `16` | power of two, 4 .. 64 |
 
 The FPU is instantiated for core 0 only. Upstream ties the APU off for all cores,
 so this adds one rather than changing one.
+
+## Changing the coefficient-bank geometry
+
+The degree and partition count are elaboration parameters, not runtime ones. They live
+in `rtl/pulp_cluster.sv` and everything downstream derives from them -- the bank width,
+the parameter bus and the FPU wrapper's `PaceFeatures`:
+
+    localparam int unsigned PaceDegree    = 2;   // <= MAX_PACE_DEGREE (4)
+    localparam int unsigned PaceParts     = 16;  // power of two, 4 .. 64
+    localparam int unsigned PaceParamWidth =
+        ((PaceDegree + 1) * PaceParts + (PaceParts - 1) + 2 * PaceEps) * PaceDataWidth;
+
+Change the two numbers, `make compile && make build`, and generate data with matching
+`n_deg` / `n_part`. The default stays at 2/16 because that is what the regression suite
+runs against; the data and the hardware must agree, so a mismatched pair fails every
+input rather than degrading.
+
+Snitch's layernorm reference uses degree 3 over 8 partitions -- 41 words instead of 65,
+and more accurate for `rsqrt` despite the smaller bank. Verified end to end:
+
+    PaceDegree 3, PaceParts 8       PARAMS_LEN = 41
+      pace_rsqrt_d3        (FP32)   errors = 0
+      pace_rsqrt_d3_fp16   (FP16)   errors = 0
+      pace_rsqrt (deg2/16 data)     errors = 1024   <- the control
+
+The last line is the one that matters: 65-word data on a 41-word bank fails all 1024
+inputs. Had it passed, the geometry would not have reached the hardware.
+
+Degree 3 buys accuracy only in FP32. Fitting `rsqrt` over [1,4] and comparing the model
+against the true function:
+
+    deg 2 / 16 parts   FP32 7.9e-5   FP16 9.8e-4
+    deg 3 /  8 parts   FP32 4.0e-5   FP16 1.5e-3
+    deg 3 / 16 parts   FP32 3.3e-6   FP16 1.8e-3
+
+FP16 sits on its own resolution floor at ~1e-3, so raising the degree there gains
+nothing. The kernels' own `verify.py` compares against a model built at the configured
+degree with `rtol=0`, so it passes at any of these -- the difference is approximation
+quality, not pass or fail.
 
 ## Software interface
 

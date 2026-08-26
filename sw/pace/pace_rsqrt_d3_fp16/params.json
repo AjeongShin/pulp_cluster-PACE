@@ -1,0 +1,19 @@
+{
+  "x_min": 0.1,
+  "x_max": 11,
+  "n_deg": 3,
+  "n_part": 8,
+  "n_test": 1024,
+  "seed": 1234,
+  "eps": 5e-07,
+  "prec": "FP16",
+  "super_fmt": "FP32",
+  "fn_name": "rsqrt",
+  "enable": true,
+  "inv": false,
+  "sqrt": false,
+  "rsqrt": true,
+  "extend": false,
+  "enable_fp32": true,
+  "debug_fname": "debug_pace_rsqrt_d3_fp16.txt"
+}
