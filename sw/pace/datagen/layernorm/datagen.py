@@ -5,34 +5,17 @@
 
 """Data generator for the scalar PACE layernorm kernel.
 
-Like softmax, layernorm is not pointwise: it needs a mean and a variance over a whole
-channel before any output element can be produced. PACE evaluates exactly one step of
-it -- the reciprocal square root of the variance, on PACE_RSQRT -- and the two
-reductions, the centring and the scaling are ordinary FP instructions.
+Per channel, following the Snitch reference:
 
-Per channel, following the Snitch reference's formulation:
-
-    x_scaled = x * inv_n            inv_n is 1/N, computed once
-    x_prod   = x_scaled * x         so q accumulates x^2/N directly
+    x_prod   = (x * inv_n) * x      inv_n is 1/N; q accumulates x^2/N directly
     sum     += x                    both reductions in one pass
     q       += x_prod
-    mean     = sum * inv_n
-    sigma2   = q - mean*mean
-    rsqrt    = PACE_RSQRT(sigma2)
-    out      = (x - mean) * rsqrt
+    sigma2   = q - mean*mean        mean = sum * inv_n
+    out      = (x - mean) * PACE_RSQRT(sigma2)
 
-The reduction order is what makes this bit-exact rather than merely close: one
-accumulator, walking the channel in the order test.c does. The Snitch model unrolls it
-across three slots and sums those at the end, which rounds differently. Reversing our
-loop is enough to produce 968 mismatches out of 1024.
-
-`x_prod` is written `(x * inv_n) * x` to mirror the reference. That association only
-matters when 1/N is inexact; with a power-of-two element count inv_n is exact, the
-multiply is a pure exponent adjustment, and `(x * x) * inv_n` gives the same bits.
-
-Only one coefficient set is needed, so unlike softmax there is no mid-kernel bank
-reload. PACE_RSQRT reduces the exponent and fits only the mantissa, so its coefficients
-cover [1, 4] no matter how large the variance is.
+The reduction order is the contract: reversing the loop gives 968 mismatches of 1024.
+The `x_prod` association does not matter while N is a power of two, because inv_n is
+then exact and the multiply is a pure exponent adjustment.
 """
 
 import argparse

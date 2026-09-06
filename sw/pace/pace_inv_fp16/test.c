@@ -61,7 +61,10 @@ int main(void) {
   //    (rv32imcxgap9 has no F extension), so the compiler can neither allocate FP
   //    registers nor assemble `.insn`; the whole sequence is emitted as raw words on
   //    fixed registers, exposing only integer registers to the compiler:
-  //      fmv.h.x fa2, x0     0xf4000653   dummy operand = 0
+  //      fmv.h.x fa2, x0     0xf4000653   zeroes rs2. Not required: the scalar decoder
+  //                                       reads rs2, but the PACE datapath ignores it and
+  //                                       dropping this line still gives errors = 0. Kept
+  //                                       so the operand is determinate in a trace.
   //      fmv.h.x fa0, a5     0xf4078553   input bit pattern -> FP register
   //      PACE_H  fa1,fa0,fa2 0x6cc505d3   funct5 01101 (inv), fmt 10 (FP16)
   //      fmv.x.h a4, fa1     0xe4058753   result -> integer register

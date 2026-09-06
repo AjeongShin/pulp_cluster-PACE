@@ -1,0 +1,19 @@
+{
+  "x_min": -11,
+  "x_max": -0.1,
+  "n_deg": 2,
+  "n_part": 16,
+  "n_test": 1024,
+  "seed": 1234,
+  "eps": 5e-07,
+  "prec": "FP16",
+  "super_fmt": "FP32",
+  "fn_name": "rsqrt",
+  "enable": true,
+  "inv": false,
+  "sqrt": false,
+  "rsqrt": true,
+  "extend": false,
+  "enable_fp32": true,
+  "debug_fname": "debug_vrsqrt_fp16.txt"
+}

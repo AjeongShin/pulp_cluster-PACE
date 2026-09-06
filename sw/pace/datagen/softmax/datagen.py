@@ -5,21 +5,9 @@
 
 """Data generator for the scalar PACE softmax kernel.
 
-Softmax is not pointwise, so it cannot be one instruction. PACE evaluates the two
-pointwise pieces -- exp through the generic pwpa opcode, and 1/x through PACE_INV --
-and the row maximum, the subtraction, the reduction and the scaling stay in software.
-That is the same split the Snitch reference uses; what differs is everything around it,
-because CV32E40P has no SSR streamer, no FREP loop and no DMA, so the kernel is a plain
-scalar loop over one core.
-
-The two functions need different coefficients and there is only one bank, so the kernel
-loads exp's coefficients, evaluates every exp, then overwrites the bank with inv's
-coefficients before the reciprocal. Snitch does the same thing with two DMA transfers.
-
-Bit-exactness makes the reduction order part of the contract: a sum of floats depends on
-the order it is accumulated in, so this model walks each row left to right in the target
-precision, exactly as test.c does. Reusing the Snitch generator's reduction would model
-its unrolled multi-lane order instead and disagree with our hardware for the right reason.
+The reduction order is the contract: a float sum depends on how it is accumulated,
+so this walks each row left to right in the target precision, exactly as test.c does.
+The Snitch generator unrolls the same reduction across lanes and rounds differently.
 """
 
 import argparse

@@ -32,7 +32,8 @@
 // Shared prologue/epilogue of every helper:
 //   fmv.w.x fa0, a5   0xf0078553    first operand  -> fa0
 //   fmv.w.x fa1, a3   0xf00685d3    second operand -> fa1
-//   fmv.w.x fa2, x0   0xf0000653    zero           -> fa2  (PACE's unused rs2)
+//   fmv.w.x fa2, x0   0xf0000653    zero -> fa2. Not required: the PACE datapath
+//                                   ignores rs2, and dropping it still gives errors = 0.
 //   fmv.x.w a4, fa1   0xe0058753    result         -> a4
 
 #define FP_BINOP(name, word)                            \
