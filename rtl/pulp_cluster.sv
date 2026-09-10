@@ -1244,36 +1244,32 @@ begin
   assign s_apu_master_rflags[k] = s_apu__rflags[k];
 end
 
-// PACE: core 0 gets a private FPU (fpnew with PACE extension)
-cv32e40p_fp_wrapper #(
-  .FPU_ADDMUL_LAT ( 1 ),
-  .FPU_OTHERS_LAT ( 0 ),
-  .PaceDegree     ( PaceDegree    ),
-  .PaceParts      ( PaceParts     ),
-  .PaceEps        ( PaceEps       ),
-  .PaceDataWidth  ( PaceDataWidth )
-) i_fp_wrapper_core0(
-  .clk_i          ( clk_i                  ),
-  .rst_ni         ( rst_ni                 ),
-  .apu_req_i      ( s_apu_master_req    [0]),
-  .apu_gnt_o      ( s_apu_master_gnt    [0]),
-  .apu_operands_i ( s_apu__operands     [0]),
-  .apu_op_i       ( s_apu__op           [0]),
-  .apu_flags_i    ( s_apu__flags        [0]),
-  .pace_mode_i    ( s_pace_mode         [0]),
-  .pace_param_i   ( s_pace_param           ), // coefficients from pace_param_mem
-  .apu_rvalid_o   ( s_apu_master_rvalid [0]),
-  .apu_rdata_o    ( s_apu_master_rdata  [0]),
-  .apu_rflags_o   ( s_apu__rflags       [0])
-);
-
-// Remaining cores keep the previous tie-off (no shared execution unit)
-for (genvar c = 1; c < Cfg.NumCores; c++) 
-  begin : gen_apu_tieoff
-    assign s_apu_master_gnt    [c] = '0;
-    assign s_apu_master_rvalid [c] = '0;
-    assign s_apu_master_rdata  [c] = '0;
-    assign s_apu__rflags       [c] = '0;
+// PACE: every core gets its own private FPU (fpnew with PACE extension).
+// All instances share the same coefficient bank (s_pace_param, from pace_param_mem below);
+// each core drives its own APU request/response slice and its own CSR_PACE-derived pace_mode.
+for (genvar c = 0; c < Cfg.NumCores; c++)
+  begin : gen_fp_wrapper
+    cv32e40p_fp_wrapper #(
+      .FPU_ADDMUL_LAT ( 1 ),
+      .FPU_OTHERS_LAT ( 0 ),
+      .PaceDegree     ( PaceDegree    ),
+      .PaceParts      ( PaceParts     ),
+      .PaceEps        ( PaceEps       ),
+      .PaceDataWidth  ( PaceDataWidth )
+    ) i_fp_wrapper_core (
+      .clk_i          ( clk_i                  ),
+      .rst_ni         ( rst_ni                 ),
+      .apu_req_i      ( s_apu_master_req    [c]),
+      .apu_gnt_o      ( s_apu_master_gnt    [c]),
+      .apu_operands_i ( s_apu__operands     [c]),
+      .apu_op_i       ( s_apu__op           [c]),
+      .apu_flags_i    ( s_apu__flags        [c]),
+      .pace_mode_i    ( s_pace_mode         [c]),
+      .pace_param_i   ( s_pace_param           ), // shared coefficient bank from pace_param_mem
+      .apu_rvalid_o   ( s_apu_master_rvalid [c]),
+      .apu_rdata_o    ( s_apu_master_rdata  [c]),
+      .apu_rflags_o   ( s_apu__rflags       [c])
+    );
   end
 
 
@@ -1312,7 +1308,7 @@ generate
       .clk_i        ( clk_i          ),
       .rst_ni       ( rst_ni         ),
       .periph_slave ( s_hwpe_cfg_bus ), // free accelerator config slot
-      .pace_param_o ( s_pace_param   )  // flat coefficient bus to core 0's FPU
+      .pace_param_o ( s_pace_param   )  // flat coefficient bus, broadcast to all 8 cores' FPUs
     );
     assign s_hci_hwpe[0].req   = 1'b0;
     assign s_hci_hwpe[0].add   = '0;
