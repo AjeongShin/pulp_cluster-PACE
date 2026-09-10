@@ -1244,33 +1244,42 @@ begin
   assign s_apu_master_rflags[k] = s_apu__rflags[k];
 end
 
-// PACE: every core gets its own private FPU (fpnew with PACE extension).
-// All instances share the same coefficient bank (s_pace_param, from pace_param_mem below);
-// each core drives its own APU request/response slice and its own CSR_PACE-derived pace_mode.
-for (genvar c = 0; c < Cfg.NumCores; c++)
-  begin : gen_fp_wrapper
-    cv32e40p_fp_wrapper #(
-      .FPU_ADDMUL_LAT ( 1 ),
-      .FPU_OTHERS_LAT ( 0 ),
-      .PaceDegree     ( PaceDegree    ),
-      .PaceParts      ( PaceParts     ),
-      .PaceEps        ( PaceEps       ),
-      .PaceDataWidth  ( PaceDataWidth )
-    ) i_fp_wrapper_core (
-      .clk_i          ( clk_i                  ),
-      .rst_ni         ( rst_ni                 ),
-      .apu_req_i      ( s_apu_master_req    [c]),
-      .apu_gnt_o      ( s_apu_master_gnt    [c]),
-      .apu_operands_i ( s_apu__operands     [c]),
-      .apu_op_i       ( s_apu__op           [c]),
-      .apu_flags_i    ( s_apu__flags        [c]),
-      .pace_mode_i    ( s_pace_mode         [c]),
-      .pace_param_i   ( s_pace_param           ), // shared coefficient bank from pace_param_mem
-      .apu_rvalid_o   ( s_apu_master_rvalid [c]),
-      .apu_rdata_o    ( s_apu_master_rdata  [c]),
-      .apu_rflags_o   ( s_apu__rflags       [c])
-    );
+// Baseline (no-FPU): Cfg.EnablePrivateFpu is 0 on this branch
+// No cv32e40p_fp_wrapper / fpnew_top is instantiated for any core 
+generate
+  if (Cfg.EnablePrivateFpu) begin : gen_fp_wrapper
+    for (genvar c = 0; c < Cfg.NumCores; c++)
+      begin : gen_fp_wrapper_core
+        cv32e40p_fp_wrapper #(
+          .FPU_ADDMUL_LAT ( 1 ),
+          .FPU_OTHERS_LAT ( 0 ),
+          .PaceDegree     ( PaceDegree    ),
+          .PaceParts      ( PaceParts     ),
+          .PaceEps        ( PaceEps       ),
+          .PaceDataWidth  ( PaceDataWidth )
+        ) i_fp_wrapper_core (
+          .clk_i          ( clk_i                  ),
+          .rst_ni         ( rst_ni                 ),
+          .apu_req_i      ( s_apu_master_req    [c]),
+          .apu_gnt_o      ( s_apu_master_gnt    [c]),
+          .apu_operands_i ( s_apu__operands     [c]),
+          .apu_op_i       ( s_apu__op           [c]),
+          .apu_flags_i    ( s_apu__flags        [c]),
+          .pace_mode_i    ( s_pace_mode         [c]),
+          .pace_param_i   ( s_pace_param           ), // shared coefficient bank from pace_param_mem
+          .apu_rvalid_o   ( s_apu_master_rvalid [c]),
+          .apu_rdata_o    ( s_apu_master_rdata  [c]),
+          .apu_rflags_o   ( s_apu__rflags       [c])
+        );
+      end
+  end else begin : gen_apu_tieoff
+    // No shared execution unit for any core.
+    assign s_apu_master_gnt    = '0;
+    assign s_apu_master_rvalid = '0;
+    assign s_apu_master_rdata  = '0;
+    assign s_apu__rflags       = '0;
   end
+endgenerate
 
 
 
@@ -1302,14 +1311,16 @@ generate
     assign s_pace_param = '0;
   end
   else begin : no_hwpe_gen
-    pace_param_mem #(
-      .PACE_PARAM_WIDTH ( PaceParamWidth )
-    ) i_pace_param_mem (
-      .clk_i        ( clk_i          ),
-      .rst_ni       ( rst_ni         ),
-      .periph_slave ( s_hwpe_cfg_bus ), // free accelerator config slot
-      .pace_param_o ( s_pace_param   )  // flat coefficient bus, broadcast to all 8 cores' FPUs
-    );
+    // Baseline: no PACE coefficient memory. Pre-PACE stub (rtl history:
+    // commit 11641f4) -- same peripheral slot (SPER_HWPE_ID), fixed
+    // response, no address-map or interconnect change versus the PACE
+    // branch, just no real storage behind it.
+    assign s_hwpe_cfg_bus.r_valid = '1;
+    assign s_hwpe_cfg_bus.gnt     = '1;
+    assign s_hwpe_cfg_bus.r_rdata = 32'hdeadbeef;
+    assign s_hwpe_cfg_bus.r_id    = '0;
+    assign s_hwpe_cfg_bus.r_opc   = '0;
+    assign s_pace_param = '0;
     assign s_hci_hwpe[0].req   = 1'b0;
     assign s_hci_hwpe[0].add   = '0;
     assign s_hci_hwpe[0].wen   = '0;

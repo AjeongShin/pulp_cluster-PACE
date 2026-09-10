@@ -329,7 +329,7 @@ module pulp_cluster_tb;
     DmBaseAddr: 'h60203000,
     BootRomBaseAddr: BootAddr,
     BootAddr: BootAddr,
-    EnablePrivateFpu: 1,
+    EnablePrivateFpu: 0, // baseline (no-FPU): 0 cv32e40p_fp_wrapper/fpnew_top instances
     EnablePrivateFpDivSqrt: 0,
     NumAxiIn: NumAxiSubordinatePorts,
     NumAxiOut: NumAxiManagerPorts,
