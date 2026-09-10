@@ -150,6 +150,10 @@ import rapid_recovery_pkg::*;
    //***************** PROCESSOR ****************************
    //********************************************************
 
+  // Baseline: the cleaned non-PACE cv32e40p dependency has no pace_mode_o
+  // port (CSR_PACE excluded), so there is nothing to forward here.
+  assign pace_mode_o = '0;
+
   generate
     if ( CORE_TYPE_CL == 0 ) begin: CV32_CORE
       assign boot_addr = boot_addr_i;
@@ -200,7 +204,6 @@ import rapid_recovery_pkg::*;
         // Atomic operation
         .data_atop_o           ( /* Unconnected */           ),
         // apu-interconnect
-        .pace_mode_o           ( pace_mode_o                 ),
         // Handshake
         .apu_req_o             ( apu_master_req_o            ),
         .apu_gnt_i             ( apu_master_gnt_i            ),

@@ -93,7 +93,8 @@ module cv32e40p_fp_wrapper
       PaceDataWidth  : PaceDataWidth,
       PaceParamWidth : PaceParamWidth,
       PaceBstPipeRegs: 4'b0100,
-      FmtConfig      : {C_RVF, C_RVD, C_XF16, C_XF8, C_XF16ALT, 4'b0} // mirrors FpFmtMask
+      // Baseline: FmtConfig all-zero -> PaceActiveFormats == 0 -> EnablePace == 0 in fpnew_opgroup_multifmt_slice.sv
+      FmtConfig      : '0
     }
   };
 
