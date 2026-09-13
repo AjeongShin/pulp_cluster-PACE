@@ -84,8 +84,9 @@ sw-clean:
 	@rm -rf pulp-runtime fault_injection_sim regression_tests
 
 ## Clone pulp-runtime as SW stack
-PULP_RUNTIME_REMOTE ?= https://github.com/pulp-platform/pulp-runtime.git
-PULP_RUNTIME_COMMIT ?= 3b48b0c6872cc01ba169a2c9c886ebb815d22cdc
+# Fork of 3b48b0c fixing a macro-rename bug in idma_v2.h that breaks USE_CV32E40P=1 builds.
+PULP_RUNTIME_REMOTE ?= https://github.com/AjeongShin/pulp-runtime.git
+PULP_RUNTIME_COMMIT ?= 1544f4b16ca6588b29caf846a6179596fdca5097
 
 pulp-runtime:
 	git clone $(PULP_RUNTIME_REMOTE) $@
