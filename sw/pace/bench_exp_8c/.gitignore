@@ -1,0 +1,6 @@
+*/build/
+*/*.log
+*/transcript
+*/modelsim.ini
+*/*.o
+data/*/debug*.txt
